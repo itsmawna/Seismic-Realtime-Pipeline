@@ -55,7 +55,7 @@ cd C:/Kafka
 (Replace <CLUSTER_ID> with a generated UUID )
 ```bash
 # Start Kafka server
-C:\Kafka> .\bin\windows\kafka-server-start.bat .\config\kraft\server.properties
+.\bin\windows\kafka-server-start.bat .\config\kraft\server.properties
 ```
 Keep this terminal open, Kafka must be running for the Producer and Processor !
 ### 2. Activate Python Environment
