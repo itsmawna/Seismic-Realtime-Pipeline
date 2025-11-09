@@ -1,0 +1,4 @@
+tornado
+kafka-python
+pyspark
+pymongo
