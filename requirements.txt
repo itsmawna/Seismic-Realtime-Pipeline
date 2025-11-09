@@ -2,3 +2,4 @@ tornado
 kafka-python
 pyspark
 pymongo
+plotly
