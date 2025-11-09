@@ -7,25 +7,25 @@ import logging
 import json
 import sys
 
-# URL du flux sismique
+# URL of the seismic stream
 echo_uri = 'wss://www.seismicportal.eu/standing_order/websocket'
 PING_INTERVAL = 15
 
-# Connexion Kafka
+# Kafka connection
 producer = KafkaProducer(bootstrap_servers=['localhost:9092'])
 TOPIC = "RawSeismicData"
 
-# Fonction qui traite chaque message reçu du flux
-def myprocessing(message):
+# Function to process each message received from the stream
+def process_message(message):
     try:
         data = json.loads(message)
         info = data['data']['properties']
         info['action'] = data['action']
 
-        # Affiche quelques infos
+        # Print some info
         logging.info(f"New event: Mag {info.get('mag')} - Region: {info.get('flynn_region')}")
 
-        # Envoi du JSON dans Kafka
+        # Send JSON to Kafka
         producer.send(TOPIC, json.dumps(info).encode('utf-8'))
         producer.flush()
 
@@ -39,7 +39,7 @@ def listen(ws):
         if msg is None:
             logging.info("Connection closed")
             break
-        myprocessing(msg)
+        process_message(msg)
 
 @gen.coroutine
 def launch_client():
@@ -49,7 +49,7 @@ def launch_client():
     except Exception:
         logging.exception("Connection error")
     else:
-        logging.info("✅ Listening for seismic events...")
+        logging.info("Listening for seismic events...")
         listen(ws)
 
 if __name__ == '__main__':

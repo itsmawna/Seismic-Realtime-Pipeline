@@ -4,9 +4,10 @@ from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 import os
 import time
 
+# Set Spark local IP
 os.environ['SPARK_LOCAL_IP'] = '127.0.0.1'
 
-# Session Spark minimaliste
+# Minimal Spark session
 spark = SparkSession.builder \
     .appName("SeismicProcessor") \
     .master("local[1]") \
@@ -17,7 +18,7 @@ spark = SparkSession.builder \
 
 spark.sparkContext.setLogLevel("ERROR")
 
-# Schema complet
+# Full schema
 schema = StructType([
     StructField("action", StringType(), True),
     StructField("mag", DoubleType(), True),
@@ -31,19 +32,19 @@ schema = StructType([
 ])
 
 print("=" * 70)
-print("🌍 PIPELINE SISMIQUE EN TEMPS RÉEL")
+print("SEISMIC REAL-TIME PIPELINE")
 print("=" * 70)
-print("🔄 Connexion à Kafka (localhost:9092)...")
+print("Connecting to Kafka (localhost:9092)...")
 print("=" * 70)
 print()
 
-# Garde en mémoire les événements déjà affichés
+# Keep track of already displayed events
 processed_events = set()
 event_count = 0
 
 while True:
     try:
-        # Lit tous les messages actuels de Kafka
+        # Read all current messages from Kafka
         df = spark.read \
             .format("kafka") \
             .option("kafka.bootstrap.servers", "localhost:9092") \
@@ -58,48 +59,48 @@ while True:
                 .select("data.*") \
                 .filter(col("mag") >= 2.0)
             
-            # Collecte les événements
+            # Collect events
             events = json_df.collect()
             
-            # Affiche seulement les nouveaux
+            # Display only new events
             for event in events:
-                # ID unique basé sur time + coordonnées
+                # Unique ID based on time + coordinates
                 event_id = f"{event.time}_{event.lat}_{event.lon}"
                 
                 if event_id not in processed_events:
                     processed_events.add(event_id)
                     event_count += 1
                     
-                    print(f"{'='*70}")
-                    print(f"🆕 ÉVÉNEMENT #{event_count}")
-                    print(f"{'='*70}")
-                    print(f"  🔴 Magnitude    : {event.mag}")
-                    print(f"  📍 Région       : {event.flynn_region}")
-                    print(f"  🕐 Temps        : {event.time}")
-                    print(f"  🌐 Latitude     : {event.lat}")
-                    print(f"  🌐 Longitude    : {event.lon}")
-                    print(f"  ⬇️  Profondeur   : {event.depth} km")
+                    print("=" * 70)
+                    print(f"EVENT #{event_count}")
+                    print("=" * 70)
+                    print(f"  Magnitude : {event.mag}")
+                    print(f"  Region    : {event.flynn_region}")
+                    print(f"  Time      : {event.time}")
+                    print(f"  Latitude  : {event.lat}")
+                    print(f"  Longitude : {event.lon}")
+                    print(f"  Depth     : {event.depth} km")
                     if event.magtype:
-                        print(f"  📊 Type mag     : {event.magtype}")
+                        print(f"  Magnitude Type : {event.magtype}")
                     if event.action:
-                        print(f"  ⚡ Action       : {event.action}")
-                    print(f"{'='*70}")
+                        print(f"  Action         : {event.action}")
+                    print("=" * 70)
                     print()
         
-        # Attend 5 secondes avant la prochaine lecture
+        # Wait 5 seconds before next read
         time.sleep(5)
         
     except KeyboardInterrupt:
         print("\n" + "=" * 70)
-        print("🛑 ARRÊT DU PIPELINE")
+        print("PIPELINE STOPPED")
         print("=" * 70)
-        print(f"📊 Total d'événements uniques traités : {event_count}")
+        print(f"Total unique events processed: {event_count}")
         print("=" * 70)
         break
         
     except Exception as e:
-        print(f"❌ Erreur: {e}")
+        print(f"Error: {e}")
         time.sleep(5)
 
 spark.stop()
-print("✅ Spark arrêté proprement")
+print("Spark stopped cleanly")

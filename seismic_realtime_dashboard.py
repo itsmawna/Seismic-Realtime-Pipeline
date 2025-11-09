@@ -9,15 +9,15 @@ from collections import deque, Counter
 # Configuration
 KAFKA_BROKER = 'localhost:9092'
 KAFKA_TOPIC = 'RawSeismicData'
-MAX_EVENTS = 100  # Garde les 100 derniers événements en mémoire
+MAX_EVENTS = 100  # Keep the last 100 events in memory
 
-# Stockage en mémoire
+# In-memory storage
 events_data = deque(maxlen=MAX_EVENTS)
 events_lock = threading.Lock()
 
 def kafka_consumer_thread():
-    """Thread pour consommer Kafka en continu"""
-    print("🔄 Connexion à Kafka...")
+    """Thread to continuously consume Kafka messages"""
+    print("🔄 Connecting to Kafka...")
     
     consumer = KafkaConsumer(
         KAFKA_TOPIC,
@@ -27,7 +27,7 @@ def kafka_consumer_thread():
         value_deserializer=lambda x: json.loads(x.decode('utf-8'))
     )
     
-    print("✅ Connecté à Kafka, en écoute...")
+    print("✅ Connected to Kafka, listening...")
     
     processed_ids = set()
     
@@ -35,27 +35,27 @@ def kafka_consumer_thread():
         try:
             data = message.value
             
-            # Filtre magnitude >= 2.0
+            # Filter magnitude >= 2.0
             if data.get('mag') and data['mag'] >= 2.0:
-                # ID unique
+                # Unique ID
                 event_id = f"{data.get('time')}_{data.get('lat')}_{data.get('lon')}"
                 
                 if event_id not in processed_ids:
                     processed_ids.add(event_id)
                     
-                    # Détection d'alerte
+                    # Alert detection
                     is_alert = False
                     alert_reasons = []
                     
                     if data.get('mag') and data['mag'] >= 5.0:
                         is_alert = True
-                        alert_reasons.append(f"FORTE MAGNITUDE ({data['mag']})")
+                        alert_reasons.append(f"HIGH MAGNITUDE ({data['mag']})")
                     
                     if data.get('depth') and data['depth'] < 20:
                         is_alert = True
-                        alert_reasons.append(f"SÉISME PEU PROFOND ({data['depth']} km)")
+                        alert_reasons.append(f"SHALLOW EARTHQUAKE ({data['depth']} km)")
                     
-                    # Ajoute à la liste
+                    # Add to the list
                     event = {
                         'id': event_id,
                         'magnitude': data.get('mag'),
@@ -74,34 +74,34 @@ def kafka_consumer_thread():
                     with events_lock:
                         events_data.append(event)
                     
-                    status = "🚨 ALERTE" if is_alert else "✅"
-                    print(f"{status} Événement reçu: Mag {data.get('mag')} - {data.get('flynn_region')}")
+                    status = "🚨 ALERT" if is_alert else "✅"
+                    print(f"{status} Event received: Mag {data.get('mag')} - {data.get('flynn_region')}")
         
         except Exception as e:
-            print(f"❌ Erreur traitement: {e}")
+            print(f"❌ Error processing: {e}")
 
 def create_dashboard():
-    """Crée le dashboard avec les données en mémoire"""
+    """Create the dashboard from in-memory data"""
     
     with events_lock:
         events = list(events_data)
     
     if not events:
-        # Dashboard vide
+        # Empty dashboard
         fig = go.Figure()
         fig.add_annotation(
-            text="⏳ En attente de données sismiques...<br>Assurez-vous que le producer et le processor sont lancés",
+            text="⏳ Waiting for seismic data...<br>Ensure the producer and processor are running",
             xref="paper", yref="paper",
             x=0.5, y=0.5, showarrow=False,
             font=dict(size=20)
         )
         fig.update_layout(
-            title="🌍 DASHBOARD SISMIQUE EN TEMPS RÉEL",
+            title="🌍 REAL-TIME SEISMIC DASHBOARD",
             height=900
         )
         return fig
     
-    # Prépare les données
+    # Prepare data
     lats = [e['latitude'] for e in events if e['latitude']]
     lons = [e['longitude'] for e in events if e['longitude']]
     mags = [e['magnitude'] for e in events if e['magnitude']]
@@ -110,18 +110,18 @@ def create_dashboard():
     depths = [e['depth'] for e in events if e['depth']]
     is_alerts = [e.get('is_alert', False) for e in events]
     
-    # Couleurs
+    # Colors
     colors = ['red' if alert else 'blue' for alert in is_alerts]
     alert_count = sum(is_alerts)
     
-    # Crée 4 subplots
+    # Create 4 subplots
     fig = make_subplots(
         rows=2, cols=2,
         subplot_titles=(
-            '🌍 Carte Mondiale des Séismes',
-            '📊 Distribution des Magnitudes',
-            '⬇️ Profondeur vs Magnitude',
-            '🌐 Top 10 Régions'
+            '🌍 World Seismic Map',
+            '📊 Magnitude Distribution',
+            '⬇️ Depth vs Magnitude',
+            '🌐 Top 10 Regions'
         ),
         specs=[
             [{"type": "scattergeo"}, {"type": "histogram"}],
@@ -131,7 +131,7 @@ def create_dashboard():
         horizontal_spacing=0.1
     )
     
-    # 1️⃣ CARTE MONDIALE
+    # 1️⃣ WORLD MAP
     fig.add_trace(
         go.Scattergeo(
             lon=lons,
@@ -144,15 +144,15 @@ def create_dashboard():
                 line=dict(width=0.5, color='white'),
                 colorscale='Reds',
             ),
-            text=[f"Mag: {m}<br>Région: {r}<br>Prof: {d} km" 
+            text=[f"Mag: {m}<br>Region: {r}<br>Depth: {d} km" 
                   for m, r, d in zip(mags, regions, depths)],
             hovertemplate='<b>%{text}</b><extra></extra>',
-            name='Séismes'
+            name='Seismic Events'
         ),
         row=1, col=1
     )
     
-    # 2️⃣ HISTOGRAMME MAGNITUDES
+    # 2️⃣ MAGNITUDE HISTOGRAM
     fig.add_trace(
         go.Histogram(
             x=mags,
@@ -164,7 +164,7 @@ def create_dashboard():
         row=1, col=2
     )
     
-    # 3️⃣ PROFONDEUR VS MAGNITUDE
+    # 3️⃣ DEPTH VS MAGNITUDE
     fig.add_trace(
         go.Scatter(
             x=mags,
@@ -176,30 +176,30 @@ def create_dashboard():
                 opacity=0.6
             ),
             text=regions,
-            hovertemplate='<b>%{text}</b><br>Mag: %{x}<br>Prof: %{y} km<extra></extra>',
-            name='Événements',
+            hovertemplate='<b>%{text}</b><br>Mag: %{x}<br>Depth: %{y} km<extra></extra>',
+            name='Events',
             showlegend=False
         ),
         row=2, col=1
     )
     
-    # 4️⃣ TOP 10 RÉGIONS
+    # 4️⃣ TOP 10 REGIONS
     region_counts = Counter(regions)
     top_regions = region_counts.most_common(10)
     
     fig.add_trace(
         go.Bar(
-            y=[r[:30] for r, _ in top_regions],  # Tronque les noms longs
+            y=[r[:30] for r, _ in top_regions],
             x=[c for _, c in top_regions],
             orientation='h',
             marker_color='lightcoral',
-            name='Régions',
+            name='Regions',
             showlegend=False
         ),
         row=2, col=2
     )
     
-    # Configuration carte
+    # Map configuration
     fig.update_geos(
         projection_type="natural earth",
         showland=True,
@@ -212,24 +212,24 @@ def create_dashboard():
     
     # Axes
     fig.update_xaxes(title_text="Magnitude", row=1, col=2)
-    fig.update_yaxes(title_text="Nombre", row=1, col=2)
+    fig.update_yaxes(title_text="Count", row=1, col=2)
     
     fig.update_xaxes(title_text="Magnitude", row=2, col=1)
-    fig.update_yaxes(title_text="Profondeur (km)", row=2, col=1)
+    fig.update_yaxes(title_text="Depth (km)", row=2, col=1)
     
-    fig.update_xaxes(title_text="Nombre d'événements", row=2, col=2)
+    fig.update_xaxes(title_text="Number of Events", row=2, col=2)
     
-    # Statistiques
+    # Statistics
     avg_mag = sum(mags) / len(mags) if mags else 0
     max_mag = max(mags) if mags else 0
     
     # Layout
     fig.update_layout(
         title={
-            'text': f'🌍 DASHBOARD SISMIQUE EN TEMPS RÉEL<br>'
-                    f'<sub>Total: {len(events)} événements | Alertes: {alert_count} | '
-                    f'Mag moy: {avg_mag:.2f} | Mag max: {max_mag:.1f} | '
-                    f'Mis à jour: {datetime.now().strftime("%H:%M:%S")}</sub>',
+            'text': f'🌍 REAL-TIME SEISMIC DASHBOARD<br>'
+                    f'<sub>Total: {len(events)} events | Alerts: {alert_count} | '
+                    f'Avg Mag: {avg_mag:.2f} | Max Mag: {max_mag:.1f} | '
+                    f'Updated: {datetime.now().strftime("%H:%M:%S")}</sub>',
             'x': 0.5,
             'xanchor': 'center',
             'font': {'size': 20}
@@ -242,39 +242,39 @@ def create_dashboard():
     return fig
 
 def main():
-    """Lance le dashboard interactif"""
+    """Launch the interactive dashboard"""
     import dash
     from dash import dcc, html
     from dash.dependencies import Input, Output
     
     print("=" * 70)
-    print("🌍 DASHBOARD SISMIQUE EN TEMPS RÉEL")
+    print("🌍 REAL-TIME SEISMIC DASHBOARD")
     print("=" * 70)
     print(f"📡 Kafka Topic: {KAFKA_TOPIC}")
-    print(f"🔄 Mémoire: {MAX_EVENTS} derniers événements")
-    print("🌐 Le dashboard s'ouvrira à: http://localhost:8050")
+    print(f"🔄 Memory: Last {MAX_EVENTS} events")
+    print("🌐 Dashboard will open at: http://localhost:8050")
     print("=" * 70)
     print()
     
-    # Lance le consumer Kafka dans un thread séparé
+    # Launch Kafka consumer in a separate thread
     consumer_thread = threading.Thread(target=kafka_consumer_thread, daemon=True)
     consumer_thread.start()
     
-    # Attend un peu pour accumuler des données
-    print("⏳ Attente de données initiales (5 secondes)...")
+    # Wait a bit to accumulate data
+    print("⏳ Waiting for initial data (5 seconds)...")
     import time
     time.sleep(5)
     
-    # Crée l'application Dash
+    # Create Dash app
     app = dash.Dash(__name__)
     
     app.layout = html.Div([
-        html.H1("🌍 Dashboard Sismique en Temps Réel", 
+        html.H1("🌍 Real-Time Seismic Dashboard", 
                 style={'textAlign': 'center', 'color': '#2c3e50'}),
         dcc.Graph(id='live-graph'),
         dcc.Interval(
             id='interval-component',
-            interval=5*1000,  # Mise à jour toutes les 5 secondes
+            interval=5*1000,  # Update every 5 seconds
             n_intervals=0
         )
     ])
@@ -286,16 +286,16 @@ def main():
     def update_graph(n):
         return create_dashboard()
     
-    print("\n✅ Dashboard lancé !")
-    print("🌐 Ouvrez votre navigateur à: http://localhost:8050")
-    print("🔄 Mise à jour automatique toutes les 5 secondes")
-    print("⚠️  Appuyez sur Ctrl+C pour arrêter\n")
+    print("\n✅ Dashboard launched!")
+    print("🌐 Open your browser at: http://localhost:8050")
+    print("🔄 Auto-update every 5 seconds")
+    print("⚠️ Press Ctrl+C to stop\n")
     
     try:
         app.run(debug=False, host='127.0.0.1', port=8050)
     except KeyboardInterrupt:
         print("\n" + "=" * 70)
-        print("🛑 Dashboard arrêté")
+        print("🛑 Dashboard stopped")
         print("=" * 70)
 
 if __name__ == "__main__":
