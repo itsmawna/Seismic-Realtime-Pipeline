@@ -1,4 +1,10 @@
 # Seismic Real-Time Pipeline
+![Python](https://img.shields.io/badge/python-3.10-blue?logo=python&logoColor=white)
+![Kafka](https://img.shields.io/badge/kafka-apache-red?logo=apachekafka&logoColor=white)
+![Spark](https://img.shields.io/badge/spark-apache-orange?logo=apachespark&logoColor=white)
+![Plotly](https://img.shields.io/badge/plotly-graph-purple?logo=plotly&logoColor=white)
+
+---
 
 This project implements a real-time seismic pipeline, from fetching data via a WebSocket stream, ingesting it into Kafka, processing it with Spark Structured Streaming, and visualizing it with an interactive Dash/Plotly dashboard.
 
