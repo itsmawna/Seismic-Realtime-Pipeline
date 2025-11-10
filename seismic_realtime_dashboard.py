@@ -87,7 +87,7 @@ def kafka_consumer_thread():
 
 
 def create_dashboard():
-    """Create professional 3x3 dashboard"""
+    """Create professional 3x3 dashboard with comprehensive legends"""
     with events_lock:
         events = list(events_data)
 
@@ -128,42 +128,61 @@ def create_dashboard():
     fig = make_subplots(
         rows=3, cols=3,
         subplot_titles=(
-            'Global Seismic Activity',
-            'Magnitude Distribution',
-            'Alert Status',
-            'Regional Activity (Top 10)',
-            'Depth Analysis',
-            'Magnitude Timeline',
+            'Global Seismic Activity Map',
+            'Magnitude Distribution (Richter Scale)',
+            'Alert Status Gauge',
+            'Top 10 Most Active Regions',
+            'Depth Analysis (Last 50 Events)',
+            'Magnitude Timeline (Last 50 Events)',
             '',
-            'Depth vs Magnitude',
-            'Event Classification'
+            'Depth vs Magnitude Correlation',
+            'Event Classification by Severity'
         ),
         specs=[
             [{"type": "scattergeo", "rowspan": 2, "colspan": 1}, {"type": "bar"}, {"type": "indicator"}],
             [None, {"type": "bar"}, {"type": "scatter"}],
             [{"type": "scatter"}, {"type": "scatter"}, {"type": "pie"}]
         ],
-        vertical_spacing=0.10,
-        horizontal_spacing=0.10,
+        vertical_spacing=0.12,
+        horizontal_spacing=0.12,
         row_heights=[0.35, 0.35, 0.30]
     )
 
-    # Global map - CORRECTION: spécifier explicitement row et col
+    # ========== GLOBAL MAP with LEGEND ==========
     sizes = [max(m*3, 6) for m in mags]
-    fig.add_trace(
-        go.Scattergeo(
-            lon=lons, lat=lats, mode='markers',
-            marker=dict(size=sizes, color=colors, opacity=0.7, line=dict(width=1, color='white')),
-            text=[f"<b>{r}</b><br>Mag: {m:.1f}<br>Depth: {d:.0f} km<br>Alert: {l.upper()}" 
-                  for m,r,d,l in zip(mags,regions,depths,alert_levels)],
-            hovertemplate='%{text}<extra></extra>',
-            name='Events',
-            showlegend=False
-        ),
-        row=1, col=1
-    )
+    
+    # Add separate traces for each alert level to create legend
+    for alert_type in ['critical', 'high', 'medium', 'normal']:
+        indices = [i for i, level in enumerate(alert_levels) if level == alert_type]
+        if indices:
+            display_names = {
+                'critical': 'Critical (≥6.0)',
+                'high': 'High (5.0-5.9)', 
+                'medium': 'Medium Alert',
+                'normal': 'Normal (<5.0)'
+            }
+            fig.add_trace(
+                go.Scattergeo(
+                    lon=[lons[i] for i in indices],
+                    lat=[lats[i] for i in indices],
+                    mode='markers',
+                    marker=dict(
+                        size=[sizes[i] for i in indices],
+                        color=color_map[alert_type],
+                        opacity=0.7,
+                        line=dict(width=1, color='white')
+                    ),
+                    text=[f"<b>{regions[i]}</b><br>Mag: {mags[i]:.1f}<br>Depth: {depths[i]:.0f} km" 
+                          for i in indices],
+                    hovertemplate='%{text}<extra></extra>',
+                    name=display_names[alert_type],
+                    legendgroup='map',
+                    showlegend=True
+                ),
+                row=1, col=1
+            )
 
-    # Magnitude histogram
+    # ========== MAGNITUDE HISTOGRAM ==========
     bins = np.arange(2, 10, 0.4)
     hist, bin_edges = np.histogram(mags, bins=bins)
     bin_centers = [(bin_edges[i] + bin_edges[i+1])/2 for i in range(len(bin_edges)-1)]
@@ -172,35 +191,44 @@ def create_dashboard():
             x=[f"{b:.1f}" for b in bin_centers][::2],
             y=hist[::2],
             marker=dict(color='#3b82f6', line=dict(color='#1e293b', width=1)),
-            showlegend=False
+            name='Event Count',
+            showlegend=False,
+            hovertemplate='Magnitude: %{x}<br>Count: %{y}<extra></extra>'
         ),
         row=1, col=2
     )
 
-    # Alert gauge
+    # ========== ALERT GAUGE ==========
     alert_pct = ((critical_count + high_count + medium_count)/len(events)*100) if events else 0
     gauge_color = '#ef4444' if alert_pct>30 else '#f59e0b' if alert_pct>15 else '#22c55e'
     fig.add_trace(
         go.Indicator(
             mode="gauge+number",
             value=alert_pct,
-            title={'text':"Alert Status",'font':{'size':16,'color':'#e2e8f0'}},
+            title={'text':"% Events Requiring Attention",'font':{'size':14,'color':'#e2e8f0'}},
             number={'suffix':"%",'font':{'size':32,'color':gauge_color}},
             gauge={
-                'axis':{'range':[None,100],'tickcolor':'#64748b','tickfont':{'color':'#94a3b8'}},
+                'axis':{'range':[None,100],'tickcolor':'#64748b','tickfont':{'color':'#94a3b8'},'ticksuffix':'%'},
                 'bar':{'color':gauge_color,'thickness':0.75},
                 'bgcolor':"#1e293b",
                 'borderwidth':2,
                 'bordercolor':"#334155",
-                'steps':[{'range':[0,15],'color':'#0f172a'},
-                        {'range':[15,30],'color':'#1e293b'},
-                        {'range':[30,100],'color':'#334155'}]
+                'steps':[
+                    {'range':[0,15],'color':'#0f172a','name':'Safe'},
+                    {'range':[15,30],'color':'#1e293b','name':'Elevated'},
+                    {'range':[30,100],'color':'#334155','name':'Critical'}
+                ],
+                'threshold': {
+                    'line': {'color': "white", 'width': 4},
+                    'thickness': 0.75,
+                    'value': alert_pct
+                }
             }
         ),
         row=1, col=3
     )
 
-    # Regional activity
+    # ========== REGIONAL ACTIVITY ==========
     region_counts = Counter(regions)
     top_regions = region_counts.most_common(10)
     region_names = [r[:30] for r,_ in top_regions]
@@ -213,13 +241,15 @@ def create_dashboard():
             marker=dict(color='#8b5cf6', line=dict(color='#1e293b', width=1)),
             text=region_values[::-1],
             textposition='auto',
-            textfont=dict(color='white'),
-            showlegend=False
+            textfont=dict(color='white', size=10),
+            name='Events Count',
+            showlegend=False,
+            hovertemplate='<b>%{y}</b><br>Events: %{x}<extra></extra>'
         ),
         row=2, col=2
     )
 
-    # Depth analysis
+    # ========== DEPTH ANALYSIS ==========
     depth_data = depths[-50:] if len(depths)>50 else depths
     fig.add_trace(
         go.Scatter(
@@ -228,12 +258,14 @@ def create_dashboard():
             mode='lines+markers',
             marker=dict(size=6, color='#06b6d4', line=dict(width=1,color='white')),
             line=dict(color='#06b6d4', width=2),
-            showlegend=False
+            name='Depth (km)',
+            showlegend=False,
+            hovertemplate='Event #%{x}<br>Depth: %{y:.0f} km<extra></extra>'
         ),
         row=2, col=3
     )
 
-    # Magnitude timeline
+    # ========== MAGNITUDE TIMELINE ==========
     mag_data = mags[-50:] if len(mags)>50 else mags
     color_data = colors[-50:] if len(colors)>50 else colors
     fig.add_trace(
@@ -245,26 +277,29 @@ def create_dashboard():
             line=dict(color='rgba(168,85,247,0.4)', width=2),
             fill='tozeroy',
             fillcolor='rgba(168,85,247,0.1)',
-            showlegend=False
+            name='Magnitude',
+            showlegend=False,
+            hovertemplate='Event #%{x}<br>Magnitude: %{y:.2f}<extra></extra>'
         ),
         row=3, col=1
     )
 
-    # Depth vs magnitude
+    # ========== DEPTH VS MAGNITUDE SCATTER ==========
     fig.add_trace(
         go.Scatter(
             x=mags, y=depths,
             mode='markers',
             marker=dict(size=10, color=colors, opacity=0.7, line=dict(width=1,color='white')),
             text=regions,
-            hovertemplate='<b>%{text}</b><br>Mag: %{x:.1f}<br>Depth: %{y:.0f} km<extra></extra>',
-            showlegend=False
+            name='Events',
+            showlegend=False,
+            hovertemplate='<b>%{text}</b><br>Magnitude: %{x:.1f}<br>Depth: %{y:.0f} km<extra></extra>'
         ),
         row=3, col=2
     )
 
-    # Event classification pie
-    class_labels = ['Critical (≥6.0)','High (5.0-5.9)','Medium Alert','Normal']
+    # ========== EVENT CLASSIFICATION PIE ==========
+    class_labels = ['Critical (≥6.0)','High (5.0-5.9)','Medium Alert','Normal (<5.0)']
     class_values = [critical_count, high_count, medium_count, normal_count]
     class_colors = ['#ef4444','#f97316','#f59e0b','#3b82f6']
 
@@ -277,15 +312,16 @@ def create_dashboard():
             labels=filtered_labels,
             values=filtered_values,
             marker=dict(colors=filtered_colors, line=dict(color='white', width=2)),
-            textinfo='label+percent',
-            textfont=dict(size=10,color='white'),
+            textinfo='label+percent+value',
+            textfont=dict(size=11,color='white'),
             hole=0.3,
-            showlegend=True
+            hovertemplate='<b>%{label}</b><br>Count: %{value}<br>Percentage: %{percent}<extra></extra>',
+            showlegend=False
         ),
         row=3, col=3
     )
 
-    # Styling - CORRECTION: update_geos pour la carte globale
+    # ========== STYLING ==========
     fig.update_geos(
         projection_type="natural earth",
         showland=True, landcolor="#1e293b",
@@ -297,20 +333,110 @@ def create_dashboard():
         row=1, col=1
     )
 
-    fig.update_xaxes(showgrid=True, gridcolor='rgba(148,163,184,0.1)', zeroline=False, color='#94a3b8', showline=True, linecolor='#334155')
-    fig.update_yaxes(showgrid=True, gridcolor='rgba(148,163,184,0.1)', zeroline=False, color='#94a3b8', showline=True, linecolor='#334155')
+    # Update X axes with proper labels
+    fig.update_xaxes(
+        title_text="Magnitude Range", title_font=dict(size=11, color='#94a3b8'),
+        showgrid=True, gridcolor='rgba(148,163,184,0.1)', 
+        zeroline=False, color='#94a3b8', 
+        showline=True, linecolor='#334155',
+        row=1, col=2
+    )
+    
+    fig.update_xaxes(
+        title_text="Number of Events", title_font=dict(size=11, color='#94a3b8'),
+        showgrid=True, gridcolor='rgba(148,163,184,0.1)',
+        zeroline=False, color='#94a3b8',
+        showline=True, linecolor='#334155',
+        row=2, col=2
+    )
+    
+    fig.update_xaxes(
+        title_text="Event Sequence (Recent → Latest)", title_font=dict(size=11, color='#94a3b8'),
+        showgrid=True, gridcolor='rgba(148,163,184,0.1)',
+        zeroline=False, color='#94a3b8',
+        showline=True, linecolor='#334155',
+        row=2, col=3
+    )
+    
+    fig.update_xaxes(
+        title_text="Event Sequence (Recent → Latest)", title_font=dict(size=11, color='#94a3b8'),
+        showgrid=True, gridcolor='rgba(148,163,184,0.1)',
+        zeroline=False, color='#94a3b8',
+        showline=True, linecolor='#334155',
+        row=3, col=1
+    )
+    
+    fig.update_xaxes(
+        title_text="Magnitude (Richter Scale)", title_font=dict(size=11, color='#94a3b8'),
+        showgrid=True, gridcolor='rgba(148,163,184,0.1)',
+        zeroline=False, color='#94a3b8',
+        showline=True, linecolor='#334155',
+        row=3, col=2
+    )
 
+    # Update Y axes with proper labels
+    fig.update_yaxes(
+        title_text="Frequency", title_font=dict(size=11, color='#94a3b8'),
+        showgrid=True, gridcolor='rgba(148,163,184,0.1)',
+        zeroline=False, color='#94a3b8',
+        showline=True, linecolor='#334155',
+        row=1, col=2
+    )
+    
+    fig.update_yaxes(
+        title_text="Region", title_font=dict(size=11, color='#94a3b8'),
+        showgrid=False,
+        zeroline=False, color='#94a3b8',
+        showline=True, linecolor='#334155',
+        row=2, col=2
+    )
+    
+    fig.update_yaxes(
+        title_text="Depth (km)", title_font=dict(size=11, color='#94a3b8'),
+        showgrid=True, gridcolor='rgba(148,163,184,0.1)',
+        zeroline=False, color='#94a3b8',
+        showline=True, linecolor='#334155',
+        row=2, col=3
+    )
+    
+    fig.update_yaxes(
+        title_text="Magnitude", title_font=dict(size=11, color='#94a3b8'),
+        showgrid=True, gridcolor='rgba(148,163,184,0.1)',
+        zeroline=False, color='#94a3b8',
+        showline=True, linecolor='#334155',
+        row=3, col=1
+    )
+    
+    fig.update_yaxes(
+        title_text="Depth (km)", title_font=dict(size=11, color='#94a3b8'),
+        showgrid=True, gridcolor='rgba(148,163,184,0.1)',
+        zeroline=False, color='#94a3b8',
+        showline=True, linecolor='#334155',
+        row=3, col=2
+    )
+
+    # Update subplot titles
     for annotation in fig['layout']['annotations']:
-        annotation['font'] = dict(size=12, color='#e2e8f0', family='Arial')
+        annotation['font'] = dict(size=13, color='#e2e8f0', family='Arial', weight='bold')
 
     fig.update_layout(
-        height=950,
+        height=980,
         plot_bgcolor='#0f172a',
         paper_bgcolor='#0f172a',
         font=dict(color='#e2e8f0', size=10, family='Arial'),
-        margin=dict(l=40,r=40,t=30,b=40),
+        margin=dict(l=50,r=50,t=40,b=50),
         hovermode='closest',
-        showlegend=False
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+            bgcolor='rgba(30,41,59,0.8)',
+            bordercolor='#334155',
+            borderwidth=1,
+            font=dict(size=10, color='#e2e8f0')
+        )
     )
 
     return fig
@@ -324,50 +450,53 @@ def main():
     # Start Kafka consumer
     threading.Thread(target=kafka_consumer_thread, daemon=True).start()
 
-    # IMPORTANT: Suppress callback exceptions to avoid conflicts
     app = dash.Dash(__name__, suppress_callback_exceptions=True)
 
-    # CORRECTION: Layout structuré avec des statistiques organisées
-    app.layout = html.Div([
-        # Header
-        html.Div([
-            html.H1("Professional Seismic Monitoring System", 
-                   style={'color':'#e2e8f0', 'margin':'0', 'fontSize':'28px'}),
-            html.Div(id='live-time', 
-                    style={'color':'#94a3b8', 'fontFamily':'monospace', 'fontSize':'16px', 'marginTop':'5px'})
-        ], style={'padding':'20px', 'borderBottom':'2px solid #334155'}),
-        
-        # Statistics Cards
-        html.Div([
+    def serve_layout():
+        """Dynamic layout to prevent caching issues"""
+        return html.Div([
+            # Header
             html.Div([
-                html.Div("📊 Total Events", style={'color':'#94a3b8', 'fontSize':'12px', 'marginBottom':'5px'}),
-                html.Div(id='stat-total', style={'color':'#3b82f6', 'fontSize':'32px', 'fontWeight':'bold'})
-            ], style={'backgroundColor':'#1e293b', 'padding':'20px', 'borderRadius':'10px', 'border':'1px solid #334155', 'flex':'1'}),
+                html.H1("🌍 Professional Seismic Monitoring System", 
+                       style={'color':'#e2e8f0', 'margin':'0', 'fontSize':'28px'}),
+                html.Div(id='live-time', 
+                        style={'color':'#94a3b8', 'fontFamily':'monospace', 'fontSize':'16px', 'marginTop':'5px'})
+            ], style={'padding':'20px', 'borderBottom':'2px solid #334155'}),
             
+            # Statistics Cards
             html.Div([
-                html.Div("🚨 Critical Alerts", style={'color':'#94a3b8', 'fontSize':'12px', 'marginBottom':'5px'}),
-                html.Div(id='stat-critical', style={'color':'#ef4444', 'fontSize':'32px', 'fontWeight':'bold'})
-            ], style={'backgroundColor':'#1e293b', 'padding':'20px', 'borderRadius':'10px', 'border':'1px solid #334155', 'flex':'1'}),
+                html.Div([
+                    html.Div("📊 Total Events", style={'color':'#94a3b8', 'fontSize':'12px', 'marginBottom':'5px'}),
+                    html.Div(id='stat-total', style={'color':'#3b82f6', 'fontSize':'32px', 'fontWeight':'bold'})
+                ], style={'backgroundColor':'#1e293b', 'padding':'20px', 'borderRadius':'10px', 'border':'1px solid #334155', 'flex':'1'}),
+                
+                html.Div([
+                    html.Div("🚨 Critical Alerts", style={'color':'#94a3b8', 'fontSize':'12px', 'marginBottom':'5px'}),
+                    html.Div(id='stat-critical', style={'color':'#ef4444', 'fontSize':'32px', 'fontWeight':'bold'})
+                ], style={'backgroundColor':'#1e293b', 'padding':'20px', 'borderRadius':'10px', 'border':'1px solid #334155', 'flex':'1'}),
+                
+                html.Div([
+                    html.Div("📈 Avg Magnitude", style={'color':'#94a3b8', 'fontSize':'12px', 'marginBottom':'5px'}),
+                    html.Div(id='stat-avg-mag', style={'color':'#f59e0b', 'fontSize':'32px', 'fontWeight':'bold'})
+                ], style={'backgroundColor':'#1e293b', 'padding':'20px', 'borderRadius':'10px', 'border':'1px solid #334155', 'flex':'1'}),
+                
+                html.Div([
+                    html.Div("⬇️ Avg Depth", style={'color':'#94a3b8', 'fontSize':'12px', 'marginBottom':'5px'}),
+                    html.Div(id='stat-avg-depth', style={'color':'#06b6d4', 'fontSize':'32px', 'fontWeight':'bold'})
+                ], style={'backgroundColor':'#1e293b', 'padding':'20px', 'borderRadius':'10px', 'border':'1px solid #334155', 'flex':'1'})
+                
+            ], style={'display':'flex', 'gap':'20px', 'padding':'20px'}),
             
-            html.Div([
-                html.Div("📈 Avg Magnitude", style={'color':'#94a3b8', 'fontSize':'12px', 'marginBottom':'5px'}),
-                html.Div(id='stat-avg-mag', style={'color':'#f59e0b', 'fontSize':'32px', 'fontWeight':'bold'})
-            ], style={'backgroundColor':'#1e293b', 'padding':'20px', 'borderRadius':'10px', 'border':'1px solid #334155', 'flex':'1'}),
+            # Main Dashboard
+            dcc.Graph(id='main-dashboard', config={'displayModeBar': False}, style={'padding':'0 20px'}),
             
-            html.Div([
-                html.Div("⬇️ Avg Depth", style={'color':'#94a3b8', 'fontSize':'12px', 'marginBottom':'5px'}),
-                html.Div(id='stat-avg-depth', style={'color':'#06b6d4', 'fontSize':'32px', 'fontWeight':'bold'})
-            ], style={'backgroundColor':'#1e293b', 'padding':'20px', 'borderRadius':'10px', 'border':'1px solid #334155', 'flex':'1'})
+            # Update Interval
+            dcc.Interval(id='interval-component', interval=3000, n_intervals=0)
             
-        ], style={'display':'flex', 'gap':'20px', 'padding':'20px'}),
-        
-        # Main Dashboard
-        dcc.Graph(id='main-dashboard', config={'displayModeBar': False}, style={'padding':'0 20px'}),
-        
-        # Update Interval
-        dcc.Interval(id='interval-component', interval=3000, n_intervals=0)
-        
-    ], style={'backgroundColor':'#020617', 'minHeight':'100vh', 'fontFamily':'Arial'})
+        ], style={'backgroundColor':'#020617', 'minHeight':'100vh', 'fontFamily':'Arial'})
+    
+    # Set dynamic layout
+    app.layout = serve_layout
 
     def get_stats():
         with events_lock:
@@ -392,7 +521,7 @@ def main():
     )
     def update_dashboard(n):
         stats = get_stats()
-        current_time = datetime.now().strftime(" %H:%M:%S")
+        current_time = datetime.now().strftime("🕐 %H:%M:%S")
         return (
             create_dashboard(),
             current_time,
