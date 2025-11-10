@@ -7,11 +7,9 @@
 ![Kafka](https://img.shields.io/badge/Kafka-231F20?style=for-the-badge&logo=apachekafka&logoColor=white)
 ![Spark](https://img.shields.io/badge/Spark-E25A1C?style=for-the-badge&logo=apache&logoColor=white)
 ![WebSocket](https://img.shields.io/badge/WebSocket-FF6F61?style=for-the-badge)
-![Seismology](https://img.shields.io/badge/Seismology-6C63FF?style=for-the-badge)
 ![Data Visualization](https://img.shields.io/badge/Data_Visualization-FDCB6E?style=for-the-badge)
 ![Real-Time Data](https://img.shields.io/badge/Real--Time_Data-00B894?style=for-the-badge)
 ![Event Processing](https://img.shields.io/badge/Event_Processing-FF6B6B?style=for-the-badge)
-![Earthquake](https://img.shields.io/badge/Earthquake-0984E3?style=for-the-badge)
 ![Structured Streaming](https://img.shields.io/badge/Structured_Streaming-6C5CE7?style=for-the-badge)
 ![Streaming Pipeline](https://img.shields.io/badge/Streaming_Pipeline-F79F1F?style=for-the-badge)
 
