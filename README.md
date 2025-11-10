@@ -1,8 +1,20 @@
 # Seismic Real-Time Pipeline
-![Python](https://img.shields.io/badge/python-3.10-blue?logo=python&logoColor=white)
-![Kafka](https://img.shields.io/badge/kafka-apache-red?logo=apachekafka&logoColor=white)
-![Spark](https://img.shields.io/badge/spark-apache-orange?logo=apachespark&logoColor=white)
-![Plotly](https://img.shields.io/badge/plotly-graph-purple?logo=plotly&logoColor=white)
+### Topics & Technologies
+
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![API](https://img.shields.io/badge/API-0088CC?style=for-the-badge)
+![IoT](https://img.shields.io/badge/IoT-F4A261?style=for-the-badge)
+![Kafka](https://img.shields.io/badge/Kafka-231F20?style=for-the-badge&logo=apachekafka&logoColor=white)
+![Spark](https://img.shields.io/badge/Spark-E25A1C?style=for-the-badge&logo=apache&logoColor=white)
+![WebSocket](https://img.shields.io/badge/WebSocket-FF6F61?style=for-the-badge)
+![Seismology](https://img.shields.io/badge/Seismology-6C63FF?style=for-the-badge)
+![Data Visualization](https://img.shields.io/badge/Data_Visualization-FDCB6E?style=for-the-badge)
+![Real-Time Data](https://img.shields.io/badge/Real--Time_Data-00B894?style=for-the-badge)
+![Event Processing](https://img.shields.io/badge/Event_Processing-FF6B6B?style=for-the-badge)
+![Earthquake](https://img.shields.io/badge/Earthquake-0984E3?style=for-the-badge)
+![Structured Streaming](https://img.shields.io/badge/Structured_Streaming-6C5CE7?style=for-the-badge)
+![Streaming Pipeline](https://img.shields.io/badge/Streaming_Pipeline-F79F1F?style=for-the-badge)
+
 
 ---
 
