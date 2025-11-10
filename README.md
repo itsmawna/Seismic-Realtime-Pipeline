@@ -100,7 +100,7 @@ python spark_streaming_processor.py
 - Counts unique events
 - Example output:
 ```bash
-🆕 EVENT #1
+EVENT #1
 ======================================================================
   Magnitude    : 3.0
   Region       : OFFSHORE COQUIMBO, CHILE
