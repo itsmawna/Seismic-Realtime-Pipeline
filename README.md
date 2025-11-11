@@ -52,11 +52,11 @@ It streams earthquake data from the **SeismicPortal WebSocket API**, ingests it 
 ---
 ## Architecture Diagram
 
-<h2 align="center">Architecture Diagram</h2>
 
 <p align="center">
   <img src="./architecture/architecture_diagram.png" alt="Seismic Real-Time Pipeline Architecture" width="700"/>
 </p>
+
 ---
 
 ## Requirements
