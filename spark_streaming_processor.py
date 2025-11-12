@@ -1,13 +1,14 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+from pymongo import MongoClient
 import os
 import time
 
 # Set Spark local IP
 os.environ['SPARK_LOCAL_IP'] = '127.0.0.1'
 
-# Minimal Spark session
+# Create Spark session
 spark = SparkSession.builder \
     .appName("SeismicProcessor") \
     .master("local[1]") \
@@ -18,7 +19,7 @@ spark = SparkSession.builder \
 
 spark.sparkContext.setLogLevel("ERROR")
 
-# Full schema
+# Define schema for Kafka JSON data
 schema = StructType([
     StructField("action", StringType(), True),
     StructField("mag", DoubleType(), True),
@@ -38,39 +39,42 @@ print("Connecting to Kafka (localhost:9092)...")
 print("=" * 70)
 print()
 
-# Keep track of already displayed events
+# Connect to MongoDB
+mongo_client = MongoClient("mongodb://localhost:27017/")
+db = mongo_client["seismicDB"]
+collection = db["events"]
+
+# Track unique events
 processed_events = set()
 event_count = 0
 
 while True:
     try:
-        # Read all current messages from Kafka
+        # Read messages from Kafka
         df = spark.read \
             .format("kafka") \
             .option("kafka.bootstrap.servers", "localhost:9092") \
             .option("subscribe", "RawSeismicData") \
             .option("startingOffsets", "earliest") \
             .load()
-        
+
         if df.count() > 0:
-            # Parse JSON
+            # Parse JSON payload
             json_df = df.selectExpr("CAST(value AS STRING) as json") \
                 .select(from_json(col("json"), schema).alias("data")) \
                 .select("data.*") \
                 .filter(col("mag") >= 2.0)
-            
-            # Collect events
+
+            # Collect new events
             events = json_df.collect()
-            
-            # Display only new events
+
             for event in events:
-                # Unique ID based on time + coordinates
                 event_id = f"{event.time}_{event.lat}_{event.lon}"
-                
+
                 if event_id not in processed_events:
                     processed_events.add(event_id)
                     event_count += 1
-                    
+
                     print("=" * 70)
                     print(f"EVENT #{event_count}")
                     print("=" * 70)
@@ -86,21 +90,41 @@ while True:
                         print(f"  Action         : {event.action}")
                     print("=" * 70)
                     print()
-        
-        # Wait 5 seconds before next read
+
+                    # Store unique event into MongoDB
+                    event_doc = {
+                        "event_id": event_id,
+                        "magnitude": event.mag,
+                        "region": event.flynn_region,
+                        "time": event.time,
+                        "latitude": event.lat,
+                        "longitude": event.lon,
+                        "depth": event.depth,
+                        "magtype": event.magtype,
+                        "action": event.action
+                    }
+
+                    # Insert only if not already stored
+                    if not collection.find_one({"event_id": event_id}):
+                        collection.insert_one(event_doc)
+                        print("Inserted into MongoDB.")
+                    else:
+                        print("Already exists in MongoDB.")
+
+        # Wait before next poll
         time.sleep(5)
-        
+
     except KeyboardInterrupt:
         print("\n" + "=" * 70)
-        print("PIPELINE STOPPED")
+        print("PIPELINE STOPPED BY USER")
         print("=" * 70)
         print(f"Total unique events processed: {event_count}")
         print("=" * 70)
         break
-        
+
     except Exception as e:
         print(f"Error: {e}")
         time.sleep(5)
 
 spark.stop()
-print("Spark stopped cleanly")
+print("Spark stopped cleanly.")

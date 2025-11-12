@@ -34,6 +34,34 @@ It streams earthquake data from the **SeismicPortal WebSocket API**, ingests it 
 - Prints unique events to console by removing duplicates using event IDs
 - Optionally counts the total number of processed events
 
+### MongoDB
+
+MongoDB serves as the persistent storage layer for the pipeline.
+- Every seismic event processed by Spark is stored as a unique document in the database.
+- This ensures that even if the Kafka stream is temporary or the app restarts, the historical seismic data remains available for future use — such as analytics, reporting, or machine learning.
+
+- Database and Collection:
+```bash
+Database: seismicDB
+```
+```bash
+Collection: events
+```
+
+Document Example:
+```bash
+{
+  "event_id": "69149a03d8a20a5230469a88",
+  "magnitude": 5.2,
+  "region": "CYPRUS REGION",
+  "time": "2025-11-12T14:23:32.15Z",
+  "latitude": 34.6858,
+  "longitude": 32.4874,
+  "depth": 3.3,
+  "magtype": "ml",
+  "action": "update"
+}
+```
 ### Seismic Real-Time Dashboard
 #### Backend (Node.js + Express + Socket.IO)
 
